@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql+asyncpg://patisson:123456@localhost:5432/patisson_authentication"
+from app.core.config import DATABASE_URL
 
 database = Database(DATABASE_URL)
 metadata = MetaData()
