@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SERVICE_NAME: str = f'authentication:{os.getenv("JWT_KEY")}'
+SERVICE_NAME: str = f'authentication:{os.getenv("SERVICE_ID")}'
 
 JWT_KEY: str = os.getenv("JWT_KEY")
 JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM")
