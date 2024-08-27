@@ -60,8 +60,8 @@ async def verify(service_jwt: ServiceJWT, verified_service_jwt: str):
         span.set_attribute(f"service.verified_service_jwt", mask_token(verified_service_jwt))
         
         is_valid, body = check_token(token=verified_service_jwt, schema=ServicePayload)
-        span.add_event(f"the token has been processed")
-        span.set_attribute(f"service.is_access_token_valid", is_valid)
+        span.add_event("the token has been processed")
+        span.set_attribute("service.is_verified_service_jwt_valid", is_valid)
         
         if is_valid:
             return body
@@ -73,8 +73,7 @@ async def verify(service_jwt: ServiceJWT, verified_service_jwt: str):
 @router.get('/update')
 async def update(service_jwt: ServiceJWT, refresh_token: str):
     with tracer.start_as_current_span("tokens-up") as span:
-        span.set_attribute(f"service.access_token", mask_token(service_jwt))
-        span.set_attribute(f"service.refresh_token", mask_token(refresh_token))
+        span.set_attribute("service.refresh_token", mask_token(refresh_token))
         
         is_valid, body = tokens_up(
             refresh_token=refresh_token, 
@@ -82,11 +81,11 @@ async def update(service_jwt: ServiceJWT, refresh_token: str):
             schema=ServicePayload
             )
         span.add_event("the tokens has been processed")
-        span.set_attribute(f"service.is_tokens_valid", is_valid)
+        span.set_attribute("service.is_tokens_valid", is_valid)
         
         if is_valid:
-            span.set_attribute(f"service.created_access_token", mask_token(body[0]))
-            span.set_attribute(f"service.created_refresh_token", mask_token(body[1]))
+            span.set_attribute("service.created_access_token", mask_token(body[0]))
+            span.set_attribute("service.created_refresh_token", mask_token(body[1]))
             return {
                 "access_token": body[0],
                 "refresh_token": body[1]

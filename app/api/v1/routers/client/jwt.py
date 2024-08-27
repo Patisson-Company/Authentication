@@ -21,7 +21,7 @@ async def create(service_jwt: ServesUsers_ServiceJWT, client_id: str, client_rol
     with tracer.start_as_current_span("validate-parameters") as span:
         span.set_attribute("client.id", client_id)
         span.set_attribute("client.role", client_role)
-        span.set_attribute("token.expire_in", expire_in)
+        span.set_attribute("token.expire_in", str(expire_in))
         try:
             role = ClientRole(client_role)
         except ValueError as e:
@@ -54,11 +54,11 @@ async def create(service_jwt: ServesUsers_ServiceJWT, client_id: str, client_rol
 @router.get('/verify')
 async def verify(service_jwt: ServiceJWT, client_access_token: str):
     with tracer.start_as_current_span("verify") as span:
-        span.set_attribute(f"client.passed_access_token", mask_token(client_access_token))
+        span.set_attribute("client.passed_access_token", mask_token(client_access_token))
         
         is_valid, body = check_token(token=client_access_token, schema=ClientPayload)
-        span.add_event(f"the token has been processed")
-        span.set_attribute(f"client.is_access_token_valid", is_valid)
+        span.add_event("the token has been processed")
+        span.set_attribute("client.is_access_token_valid", is_valid)
         
         if is_valid:
             return body
@@ -73,7 +73,7 @@ async def update(service_jwt: ServesUsers_ServiceJWT, client_access_token: str,
     with tracer.start_as_current_span("tokens-up") as span:
         span.set_attribute(f"client.passed_access_token", mask_token(client_access_token))
         span.set_attribute(f"client.passed_refresh_token", mask_token(client_refresh_token))
-        span.set_attribute("token.expire_in", expire_in)
+        span.set_attribute("token.expire_in", str(expire_in))
         
         is_valid, body = tokens_up(
             refresh_token=client_refresh_token, 
@@ -82,11 +82,11 @@ async def update(service_jwt: ServesUsers_ServiceJWT, client_access_token: str,
             expires_in=expire_in
             )
         span.add_event("the tokens has been processed")
-        span.set_attribute(f"client.is_tokens_valid", is_valid)
+        span.set_attribute("client.is_tokens_valid", is_valid)
         
         if is_valid:
-            span.set_attribute(f"client.created_access_token", mask_token(body[0]))
-            span.set_attribute(f"client.created_refresh_token", mask_token(body[1]))
+            span.set_attribute("client.created_access_token", mask_token(body[0]))
+            span.set_attribute("client.created_refresh_token", mask_token(body[1]))
             return {
                 "access_token": body[0],
                 "refresh_token": body[1]
