@@ -9,4 +9,3 @@ async def service_auth(session: AsyncSession, login: str, password: str) -> Serv
     service = result.scalars().first()
     if service and service.check_password(password):
         return service
-    return None

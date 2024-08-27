@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String
 from db.base import Base
-from core.security import Password
+from passlib.context import CryptContext
+from sqlalchemy import Column, Integer, String
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Service(Base):
     __tablename__ = "services"
@@ -12,7 +13,7 @@ class Service(Base):
     role = Column(String, nullable=False)
 
     def set_password(self, password: str) -> None:
-        self.password = Password.hash(password)
+        self.password = pwd_context.hash(password)
 
     def check_password(self, password: str) -> bool:
-        return Password.verify(password, self.password)
+        return pwd_context.verify(password, self.password)

@@ -30,7 +30,7 @@ def verify_serves_users__service_token(credentials: HTTPAuthorizationCredentials
     if not all(REQUIRED_PERM):
         raise error(
             status_code=status.HTTP_403_FORBIDDEN,
-            errors=[ErrorSchema(error=ErrorCode.JWT_INVALID, extra=TokenBearer.SERVICE.value)]  # ErrorCode.AccessError
+            errors=[ErrorSchema(error=ErrorCode.ACCESS_ERROR, extra=TokenBearer.SERVICE.value)]
             )
     return token
     

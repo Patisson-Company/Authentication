@@ -85,7 +85,9 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
     try:
         assert access_body.sub == refresh_body.sub
     except AssertionError:
-        errors_report.append(ErrorSchema(error=ErrorCode.JWT_INVALID))  # ErrorCode.JWT_SUB_NOT_EQUAL
+        errors_report.append(ErrorSchema(error=ErrorCode.JWT_SUB_NOT_EQUAL))
+    except AttributeError:  # AttributeError: 'ErrorSchema' object has no attribute 'sub'
+        pass
     if len(errors_report) > 0:
         return False, error(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -110,7 +112,7 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
     )
     
     return True, (new_access_token, new_refresh_token)
-ServiceRole.SERVES_USERS
+
 
 def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = None,
                 _return_ErrorSchema: bool = False) -> (
@@ -157,6 +159,15 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = N
 def create_sub(bearer: TokenBearer, entity_id: str) -> str:
     return f'{bearer.value}{SUB_SEPARATOR}{entity_id}'        
         
+
+def mask_token(token: AnyStr, visible_chars: int = 4) -> str:
+    token = str(token)
+    if len(token) <= visible_chars:
+        return token
+    masked_part = '*' * (len(token) - visible_chars)
+    visible_part = token[-visible_chars:]
+    return f"{masked_part}{visible_part}"
+
         
 def _find_carrier(schema: type[PAYLOAD], carrier: Optional[str] = None) -> str | None:
     if not carrier:
