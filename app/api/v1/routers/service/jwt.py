@@ -1,4 +1,4 @@
-from api.deps import ServiceJWT, SessionDep, verify_service_token, security
+from api.deps import ServiceJWT, SessionDep, security
 from db.base import get_session
 from db.crud_service import service_auth
 from fastapi import APIRouter, Depends, status
@@ -70,16 +70,17 @@ async def verify(service_jwt: ServiceJWT, verified_service_jwt: str):
             span.set_status(Status(StatusCode.ERROR))
             raise body
                 
- 
+
 @router.get('/update')
-async def update(refresh_token: str, 
+async def update(service_jwt: ServiceJWT, refresh_token: str, 
                  credentionals: HTTPAuthorizationCredentials = Depends(security)):
+    # A token with the AnyStr type is required, not a ServicePayload (type of service_jwt)
     with tracer.start_as_current_span("tokens-up") as span:
         span.set_attribute("service.refresh_token", mask_token(refresh_token))
         
         is_valid, body = tokens_up(
             refresh_token=refresh_token, 
-            access_token=credentionals.credentials, 
+            access_token=credentionals.credentials,  # binary service access token
             schema=ServicePayload
             )
         span.add_event("the tokens has been processed")
@@ -95,5 +96,3 @@ async def update(refresh_token: str,
         else:
             span.set_status(Status(StatusCode.ERROR))
             raise body
-        
-        
