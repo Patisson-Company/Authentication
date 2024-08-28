@@ -1,7 +1,8 @@
-from api.deps import ServiceJWT, SessionDep
+from api.deps import ServiceJWT, SessionDep, verify_service_token, security
 from db.base import get_session
 from db.crud_service import service_auth
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
+from fastapi.security import HTTPAuthorizationCredentials
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from patisson_errors import ErrorCode, ErrorSchema
@@ -68,16 +69,17 @@ async def verify(service_jwt: ServiceJWT, verified_service_jwt: str):
         else: 
             span.set_status(Status(StatusCode.ERROR))
             raise body
-        
-    
+                
+ 
 @router.get('/update')
-async def update(service_jwt: ServiceJWT, refresh_token: str):
+async def update(refresh_token: str, 
+                 credentionals: HTTPAuthorizationCredentials = Depends(security)):
     with tracer.start_as_current_span("tokens-up") as span:
         span.set_attribute("service.refresh_token", mask_token(refresh_token))
         
         is_valid, body = tokens_up(
             refresh_token=refresh_token, 
-            access_token=service_jwt, 
+            access_token=credentionals.credentials, 
             schema=ServicePayload
             )
         span.add_event("the tokens has been processed")

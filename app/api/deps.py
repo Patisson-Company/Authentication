@@ -15,6 +15,7 @@ from tokens.jwt import check_token, mask_token
 security = HTTPBearer()
 tracer = trace.get_tracer(__name__)
 
+
 def verify_service_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> ServicePayload | HTTPException:
     with tracer.start_as_current_span("verify-service-token") as span:
         token = credentials.credentials
