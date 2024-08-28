@@ -1,5 +1,5 @@
 from api import router
-from core.config import SERVICE_NAME as SERVICE_NAME_
+from core import config
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from opentelemetry import trace
@@ -12,13 +12,10 @@ from patisson_errors.fastapi import validation_exception_handler
 
 trace.set_tracer_provider(
     TracerProvider(
-        resource=Resource.create({SERVICE_NAME: SERVICE_NAME_})
+        resource=Resource.create({SERVICE_NAME: config.SERVICE_NAME})
     )
 )
-jaeger_exporter = JaegerExporter(
-    agent_host_name="localhost",
-    agent_port=6831,
-)
+jaeger_exporter = JaegerExporter()
 trace.get_tracer_provider().add_span_processor(
     BatchSpanProcessor(jaeger_exporter)
 )
@@ -31,4 +28,4 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host=config.SERVICE_HOST, port=config.SERVICE_PORT)
