@@ -30,6 +30,7 @@ def verify_service_token(credentials: HTTPAuthorizationCredentials = Depends(sec
             span.set_status(Status(StatusCode.ERROR))
             raise body
 
+
 def verify_serves_users__service_token(token: ServicePayload = Depends(verify_service_token)
                                        ) -> ServicePayload | HTTPException:
     with tracer.start_as_current_span("checking-access-rights") as span:

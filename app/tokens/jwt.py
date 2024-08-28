@@ -20,6 +20,11 @@ Seconds: TypeAlias = int
 
 
 def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds] = None) -> bytes:
+    '''
+    Creates a jwt token for the client.
+    
+    If expire_in is set to None, the default value will be used.
+    '''
     expires_in_ = timedelta(seconds=expires_in) if expires_in else JWT_EXPIRATION_TIME 
     now = datetime.now(UTC)
     payload = ClientPayload(
@@ -33,6 +38,11 @@ def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds
 
 
 def create_service_token(role: Role, service_id: str, expires_in: Optional[Seconds] = None) -> bytes:
+    '''
+    Creates a jwt token for the service.
+    
+    If expire_in is set to None, the default value will be used.
+    '''
     expires_in_ = timedelta(seconds=expires_in) if expires_in else JWT_EXPIRATION_TIME
     now = datetime.now(UTC)
     payload = ServicePayload(
@@ -46,6 +56,13 @@ def create_service_token(role: Role, service_id: str, expires_in: Optional[Secon
 
 
 def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> bytes:
+    '''
+    Creates a refresh token for a client or service.
+    
+    If expire_in is set to None, the default value will be used.
+    
+    To pass a sub, use create_sub() from the same module.
+    '''
     expires_in_ = timedelta(seconds=expires_in) if expires_in else JWT_EXPIRATION_TIME
     now = datetime.now(UTC)
     payload = RefreshPayload(
@@ -63,6 +80,13 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
                   tuple[Literal[True], tuple[bytes, bytes]] 
                   | tuple[Literal[False], HTTPException]
                   ):
+    '''
+    Checks access and refresh tokens, and if they are valid, 
+    returns True with the first argument and tuple with a pair of new tokens. 
+    
+    If the passed tokens are not valid, 
+    it returns False with the first argument and HTTPException with the second.
+    '''
     carrier = _find_carrier(schema)
     is_access_token_valid, access_body = check_token(
         token=access_token, 
@@ -120,6 +144,18 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = N
                     | tuple[Literal[False], HTTPException]
                     | tuple[Literal[False], ErrorSchema]
                     ):
+    '''
+    Verifies the token. If the token has passed verification, 
+    it returns True with the first argument 
+    and the payload of the token with the second argument.
+    
+    If the token fails verification, it returns False with the first argument 
+    and HttpException with the second argument.
+    
+    If _return_ErrorSchema=True and the token is not valid, 
+    it returns False with the first argument 
+    and ErrorSchema (patisson_errors.core) with the second.
+    '''
     carrier = _find_carrier(schema, carrier)
     flag = False
     try:
@@ -157,10 +193,16 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = N
 
 
 def create_sub(bearer: TokenBearer, entity_id: str) -> str:
+    '''
+    Use this to create a sub for tokens.
+    '''
     return f'{bearer.value}{SUB_SEPARATOR}{entity_id}'        
         
 
 def mask_token(token: AnyStr, visible_chars: int = 4) -> str:
+    '''
+    Closes the token * except for the last characters.
+    '''
     token = str(token)
     if len(token) <= visible_chars:
         return token
@@ -169,7 +211,13 @@ def mask_token(token: AnyStr, visible_chars: int = 4) -> str:
     return f"{masked_part}{visible_part}"
 
         
-def _find_carrier(schema: type[PAYLOAD], carrier: Optional[str] = None) -> str | None:
+def _find_carrier(schema: type[ServicePayload | ClientPayload], 
+                  carrier: Optional[str] = None) -> str | None:
+    '''
+    If carrier!=None, returns carrier.
+    If schema=ServicePayload, returns Token Bearer.SERVICE.value. 
+    If schema=ClientPayload, returns Token Bearer.CLIENT.value
+    '''
     if not carrier:
         if schema == ServicePayload: return TokenBearer.SERVICE.value
         elif schema == ClientPayload: return TokenBearer.CLIENT.value
