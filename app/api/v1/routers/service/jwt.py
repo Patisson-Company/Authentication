@@ -26,7 +26,7 @@ async def create(session: SessionDep, login: str, password: str):
         async with get_session() as session:
             service = await service_auth(session, login, password)
         span.add_event("the database request has been completed")
-        span.set_attribute("db.query.service", service)
+        span.set_attribute("db.query.service", str(service))
         
         if not service:
             span.set_status(Status(StatusCode.ERROR))
