@@ -2,8 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import AnyStr, Literal, Optional, TypeAlias, TypeVar, Union
 
 import jwt
-from core.config import (JWT_ALGORITHM, JWT_EXPIRATION_TIME, JWT_KEY,
-                         SERVICE_NAME)
+from config import JWT_ALGORITHM, JWT_EXPIRATION_TIME, JWT_KEY, SERVICE_NAME
 from fastapi import HTTPException, status
 from patisson_errors.core import ErrorCode, ErrorSchema
 from patisson_errors.fastapi import error

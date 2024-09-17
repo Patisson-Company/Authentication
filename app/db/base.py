@@ -2,14 +2,12 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
-from databases import Database
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 
-from core.config import DATABASE_URL
+from config import DATABASE_URL
 
-database = Database(DATABASE_URL)
 
 engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 Base = declarative_base()

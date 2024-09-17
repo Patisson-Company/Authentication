@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from db.base import Session, get_session
+from db.base import get_session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from opentelemetry import trace
@@ -10,6 +10,7 @@ from patisson_errors.fastapi import error
 from patisson_tokens.jwt.schemas import ServicePayload
 from patisson_tokens.jwt.types import TokenBearer
 from patisson_tokens.roles import ServiceRole
+from sqlalchemy.orm import Session
 from tokens.jwt import check_token, mask_token
 
 security = HTTPBearer()

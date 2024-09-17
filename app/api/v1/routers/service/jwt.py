@@ -1,6 +1,6 @@
 from api.deps import ServiceJWT, SessionDep, security
 from db.base import get_session
-from db.crud_service import service_auth
+from db.crud import service_auth
 from fastapi import APIRouter, Depends, status
 from fastapi.security import HTTPAuthorizationCredentials
 from opentelemetry import trace

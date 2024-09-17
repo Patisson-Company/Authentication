@@ -1,4 +1,4 @@
-from db.models.service import Service
+from db.models import Service
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
