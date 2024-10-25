@@ -16,4 +16,4 @@ class Service(Base):
         self.password = pwd_context.hash(password)
 
     def check_password(self, password: str) -> bool:
-        return pwd_context.verify(password, self.password)
+        return pwd_context.verify(password, str(self.password))

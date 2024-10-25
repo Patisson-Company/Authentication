@@ -4,12 +4,12 @@ from typing import AnyStr, Literal, Optional, TypeAlias, TypeVar, Union
 import jwt
 from config import JWT_ALGORITHM, JWT_EXPIRATION_TIME, JWT_KEY, SERVICE_NAME
 from fastapi import HTTPException, status
-from patisson_errors.core import ErrorCode, ErrorSchema
-from patisson_errors.fastapi import error
-from patisson_tokens import ClientRole, Role, ServiceRole
-from patisson_tokens.jwt.schemas import (ClientPayload, RefreshPayload,
-                                         ServicePayload)
-from patisson_tokens.jwt.types import TokenBearer, TokenType
+from patisson_request.errors import ErrorCode, ErrorSchema
+from patisson_request.jwt_tokens import (ClientPayload, RefreshPayload,
+                                         ServicePayload, TokenBearer,
+                                         TokenType)
+from patisson_request.service_responses import AuthenticationResponse
+from patisson_request.service_roles import ClientRole, Role, ServiceRole
 from pydantic import ValidationError
 
 SUB_SEPARATOR = '.'
@@ -18,7 +18,7 @@ PAYLOAD = TypeVar('PAYLOAD', bound=Union[ClientPayload, ServicePayload, RefreshP
 Seconds: TypeAlias = int
 
 
-def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds] = None) -> bytes:
+def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds] = None) -> str:
     '''
     Creates a jwt token for the client.
     
@@ -36,7 +36,7 @@ def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds
     return jwt.encode(payload.model_dump(), JWT_KEY, algorithm=JWT_ALGORITHM)
 
 
-def create_service_token(role: Role, service_id: str, expires_in: Optional[Seconds] = None) -> bytes:
+def create_service_token(role: Role, service_id: str, expires_in: Optional[Seconds] = None) -> str:
     '''
     Creates a jwt token for the service.
     
@@ -54,7 +54,7 @@ def create_service_token(role: Role, service_id: str, expires_in: Optional[Secon
     return jwt.encode(payload.model_dump(), JWT_KEY, algorithm=JWT_ALGORITHM)
 
 
-def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> bytes:
+def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> str:
     '''
     Creates a refresh token for a client or service.
     
@@ -74,9 +74,8 @@ def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> byte
 
 
 def tokens_up(refresh_token: AnyStr, access_token: AnyStr, 
-              schema: type[ClientPayload | ServicePayload],
-              expires_in: Optional[Seconds] = None) -> (
-                  tuple[Literal[True], tuple[bytes, bytes]] 
+              carrier: TokenBearer, expires_in: Optional[Seconds] = None) -> (
+                  tuple[Literal[True], AuthenticationResponse.TokensSet] 
                   | tuple[Literal[False], HTTPException]
                   ):
     '''
@@ -86,58 +85,60 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
     If the passed tokens are not valid, 
     it returns False with the first argument and HTTPException with the second.
     '''
-    carrier = _find_carrier(schema)
     is_access_token_valid, access_body = check_token(
         token=access_token, 
-        schema=schema, 
-        carrier=f'{carrier}.{TokenType.ACCESS.value}',
+        schema=ClientPayload if carrier == TokenBearer.CLIENT else ServicePayload, 
+        carrier=carrier,
         _return_ErrorSchema=True
         )
     is_refresh_token_valid, refresh_body = check_token(
         token=refresh_token, 
         schema=RefreshPayload, 
-        carrier=f'{carrier}.{TokenType.REFRESH.value}',
+        carrier=carrier,
         _return_ErrorSchema=True
         )
     
-    errors_report = []
+    errors_report: list[ErrorSchema] = []
     if not is_access_token_valid:
-        errors_report.append(access_body) 
+        errors_report.append(access_body)   # type: ignore[reportArgumentType]
     if not is_refresh_token_valid:
-        errors_report.append(refresh_body)
+        errors_report.append(refresh_body)  # type: ignore[reportArgumentType]
     try:
-        assert access_body.sub == refresh_body.sub
+        assert access_body.sub == refresh_body.sub  # type: ignore[reportAttributeAccessIssue]
     except AssertionError:
         errors_report.append(ErrorSchema(error=ErrorCode.JWT_SUB_NOT_EQUAL))
     except AttributeError:  # AttributeError: 'ErrorSchema' object has no attribute 'sub'
         pass
     if len(errors_report) > 0:
-        return False, error(
+        return False, HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            errors=errors_report
+            detail=[error.model_dump() for error in errors_report]
         )  
     
-    if carrier == TokenBearer.CLIENT.value:
+    if carrier == TokenBearer.CLIENT:
         new_access_token = create_client_token(
-            role=ClientRole(access_body.role),
-            client_id=access_body.sub.split(SUB_SEPARATOR)[1],
+            role=ClientRole(access_body.role),  # type: ignore[reportAttributeAccessIssue]
+            client_id=access_body.sub.split(SUB_SEPARATOR)[1],  # type: ignore[reportAttributeAccessIssue]
             expires_in=expires_in
         )
-    elif carrier == TokenBearer.SERVICE.value:
+    elif carrier == TokenBearer.SERVICE:
         new_access_token = create_service_token(
-            role=ServiceRole(access_body.role),
-            service_id=access_body.sub.split(SUB_SEPARATOR)[1],
+            role=ServiceRole(access_body.role),  # type: ignore[reportAttributeAccessIssue]
+            service_id=access_body.sub.split(SUB_SEPARATOR)[1],  # type: ignore[reportAttributeAccessIssue]
             expires_in=expires_in
         )
     new_refresh_token = create_refresh_token(
-        sub=access_body.sub,
+        sub=access_body.sub,  # type: ignore[reportAttributeAccessIssue]
         expires_in=expires_in
     )
     
-    return True, (new_access_token, new_refresh_token)
+    return True, AuthenticationResponse.TokensSet(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token
+    )
 
 
-def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = None,
+def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: TokenBearer,
                 _return_ErrorSchema: bool = False) -> (
                     tuple[Literal[True], PAYLOAD] 
                     | tuple[Literal[False], HTTPException]
@@ -155,7 +156,6 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = N
     it returns False with the first argument 
     and ErrorSchema (patisson_errors.core) with the second.
     '''
-    carrier = _find_carrier(schema, carrier)
     flag = False
     try:
         body = schema(
@@ -164,30 +164,30 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: Optional[str] = N
         flag = True
     except jwt.ExpiredSignatureError:
         error_ = ErrorSchema(
-            error=ErrorCode.JWT_EXPIRED,
-            extra=carrier
+            error=ErrorCode.JWT_EXPIRED if carrier == TokenBearer.SERVICE 
+            else ErrorCode.CLIENT_JWT_EXPIRED
             )   
         status_code = status.HTTP_403_FORBIDDEN
     except jwt.InvalidTokenError:
         error_ = ErrorSchema(
-            error=ErrorCode.JWT_INVALID,
-            extra=carrier
+            error=ErrorCode.JWT_INVALID if carrier == TokenBearer.SERVICE 
+            else ErrorCode.CLIENT_JWT_INVALID
             )   
         status_code = status.HTTP_401_UNAUTHORIZED
     except ValidationError:
         error_ = ErrorSchema(
-            error=ErrorCode.JWT_INVALID,
-            extra=carrier
+            error=ErrorCode.JWT_INVALID if carrier == TokenBearer.SERVICE 
+            else ErrorCode.CLIENT_JWT_INVALID
         )
         status_code = status.HTTP_400_BAD_REQUEST
     finally:
         if flag: 
-            return True, body
+            return True, body  # type: ignore[reportReturnType]
         if _return_ErrorSchema:
             return False, error_
-        return False, error(
+        return False, HTTPException(
             status_code=status_code,
-            errors=[error_]
+            detail=[error_.model_dump()]
         )
 
 
@@ -198,26 +198,12 @@ def create_sub(bearer: TokenBearer, entity_id: str) -> str:
     return f'{bearer.value}{SUB_SEPARATOR}{entity_id}'        
         
 
-def mask_token(token: AnyStr, visible_chars: int = 4) -> str:
+def mask_token(token: str, visible_chars: int = 4) -> str:
     '''
     Closes the token * except for the last characters.
     '''
-    token = str(token)
     if len(token) <= visible_chars:
         return token
     masked_part = '*' * (len(token) - visible_chars)
     visible_part = token[-visible_chars:]
     return f"{masked_part}{visible_part}"
-
-        
-def _find_carrier(schema: type[ServicePayload | ClientPayload], 
-                  carrier: Optional[str] = None) -> str | None:
-    '''
-    If carrier!=None, returns carrier.
-    If schema=ServicePayload, returns Token Bearer.SERVICE.value. 
-    If schema=ClientPayload, returns Token Bearer.CLIENT.value
-    '''
-    if not carrier:
-        if schema == ServicePayload: return TokenBearer.SERVICE.value
-        elif schema == ClientPayload: return TokenBearer.CLIENT.value
-    else: return carrier

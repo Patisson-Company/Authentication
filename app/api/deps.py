@@ -5,11 +5,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
-from patisson_errors import ErrorCode, ErrorSchema
-from patisson_errors.fastapi import error
-from patisson_tokens.jwt.schemas import ServicePayload
-from patisson_tokens.jwt.types import TokenBearer
-from patisson_tokens.roles import ServiceRole
+from patisson_request.errors import ErrorCode, ErrorSchema
+from patisson_request.jwt_tokens import ServicePayload, TokenBearer
+from patisson_request.service_roles import ServiceRole
 from sqlalchemy.orm import Session
 from tokens.jwt import check_token, mask_token
 
@@ -22,18 +20,18 @@ def verify_service_token(credentials: HTTPAuthorizationCredentials = Depends(sec
         token = credentials.credentials
         span.set_attribute("service.access_token", mask_token(token))
         
-        is_valid, body = check_token(token=token, schema=ServicePayload)
+        is_valid, body = check_token(token=token, schema=ServicePayload, carrier=TokenBearer.SERVICE)
         span.add_event("the token has been processed")
         span.set_attribute("service.is_access_token_valid", is_valid)
         
         if is_valid:
-            return body
+            return body  # type: ignore[reportReturnType]
         else:
             span.set_status(Status(StatusCode.ERROR))
-            raise body
+            raise body  # type: ignore[reportReturnType]
 
 
-def verify_serves_users__service_token(token: ServicePayload = Depends(verify_service_token)
+def verify_serves_users_service_token(token: ServicePayload = Depends(verify_service_token)
                                        ) -> ServicePayload | HTTPException:
     with tracer.start_as_current_span("checking-access-rights") as span:
         service_role = ServiceRole(token.role)
@@ -43,14 +41,14 @@ def verify_serves_users__service_token(token: ServicePayload = Depends(verify_se
             ]
         if not all(REQUIRED_PERM):
             span.set_status(Status(StatusCode.ERROR))
-            raise error(
+            raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                errors=[ErrorSchema(error=ErrorCode.ACCESS_ERROR, extra=TokenBearer.SERVICE.value)]
+                detail=[ErrorSchema(error=ErrorCode.ACCESS_ERROR, extra=TokenBearer.SERVICE.value)]
                 )
         return token
     
     
 ServiceJWT = Annotated[ServicePayload, Depends(verify_service_token)]
-ServesUsers_ServiceJWT = Annotated[ServicePayload, Depends(verify_serves_users__service_token)]
+ServesUsers_ServiceJWT = Annotated[ServicePayload, Depends(verify_serves_users_service_token)]
 
 SessionDep = Annotated[Session, Depends(get_session)]

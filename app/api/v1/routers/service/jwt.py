@@ -1,15 +1,16 @@
 from api.deps import ServiceJWT, SessionDep, security
+from api.v1.routers.shemas import (CreateServiceRequest, UpdateServiceRequest,
+                                   VerifyRequest)
 from db.base import get_session
 from db.crud import service_auth
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
-from patisson_errors import ErrorCode, ErrorSchema
-from patisson_errors.fastapi import error
-from patisson_tokens import ServiceRole
-from patisson_tokens.jwt.schemas import ServicePayload
-from patisson_tokens.jwt.types import TokenBearer
+from patisson_request.errors import ErrorCode, ErrorSchema
+from patisson_request.jwt_tokens import ServicePayload, TokenBearer
+from patisson_request.service_responses import AuthenticationResponse
+from patisson_request.service_roles import ServiceRole
 from tokens.jwt import (check_token, create_refresh_token,
                         create_service_token, create_sub, mask_token,
                         tokens_up)
@@ -17,82 +18,85 @@ from tokens.jwt import (check_token, create_refresh_token,
 router = APIRouter()
 tracer = trace.get_tracer(__name__)
 
-@router.get('/create')
-async def create(session: SessionDep, login: str, password: str):
+@router.post('/create')
+async def create(session: SessionDep, request: CreateServiceRequest) -> AuthenticationResponse.TokensSet:
+    login = request.login
+    password = request.password
     
     with tracer.start_as_current_span("service-authentication") as span:
         span.set_attribute("service.login", login)
         span.set_attribute("service.password", mask_token(password, visible_chars=2))
-        async with get_session() as session:
-            service = await service_auth(session, login, password)
+        async with get_session() as session:  # type: ignore[reportAssignmentType]
+            service = await service_auth(session, login, password)  # type: ignore[reportAssignmentType]
         span.add_event("the database request has been completed")
         span.set_attribute("db.query.service", str(service))
         
         if not service:
             span.set_status(Status(StatusCode.ERROR))
-            raise error(
+            raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, 
-                errors=[ErrorSchema(error=ErrorCode.BAD_CREDENTIALS)]
+                detail=[ErrorSchema(error=ErrorCode.BAD_CREDENTIALS)]
             )
     
     with tracer.start_as_current_span("creating-tokens") as span:
         access_token = create_service_token(
-            role=ServiceRole(service.role),
+            role=ServiceRole(str(service.role)),
             service_id=str(service.id)
-            )
+        )
         span.add_event("access token is ready")
         span.set_attribute("service.created_access_token", mask_token(access_token))
         
         refresh_token = create_refresh_token(
             sub=create_sub(TokenBearer.SERVICE, str(service.id))
-            )
+        )
         span.add_event("refresh token is ready")
         span.set_attribute("service.created_refresh_token", mask_token(refresh_token))
         
-    return {
-            "access_token": access_token,
-            "refresh_token": refresh_token
-            }
-    
-    
-@router.get('/verify')
-async def verify(service_jwt: ServiceJWT, verified_service_jwt: str):
+    return AuthenticationResponse.TokensSet(
+        access_token=access_token,
+        refresh_token=refresh_token
+    )
+
+
+@router.post('/verify')
+async def verify(service_jwt: ServiceJWT, request: VerifyRequest) -> ServicePayload:
+    verified_service_jwt = request.access_token
     with tracer.start_as_current_span("verify") as span:
         span.set_attribute(f"service.verified_service_jwt", mask_token(verified_service_jwt))
         
-        is_valid, body = check_token(token=verified_service_jwt, schema=ServicePayload)
+        is_valid, body = check_token(token=verified_service_jwt, 
+                                     schema=ServicePayload, carrier=TokenBearer.SERVICE)
         span.add_event("the token has been processed")
         span.set_attribute("service.is_verified_service_jwt_valid", is_valid)
         
         if is_valid:
-            return body
+            return body  # type: ignore[reportReturnType]
         else: 
             span.set_status(Status(StatusCode.ERROR))
-            raise body
-                
+            raise body  # type: ignore[reportGeneralTypeIssues]
 
-@router.get('/update')
-async def update(service_jwt: ServiceJWT, refresh_token: str, 
-                 credentionals: HTTPAuthorizationCredentials = Depends(security)):
+
+@router.post('/update')
+async def update(service_jwt: ServiceJWT, request: UpdateServiceRequest, credentials: HTTPAuthorizationCredentials = Depends(security)) -> AuthenticationResponse.TokensSet:
+    refresh_token = request.refresh_token
+
     # A token with the AnyStr type is required, not a ServicePayload (type of service_jwt)
     with tracer.start_as_current_span("tokens-up") as span:
         span.set_attribute("service.refresh_token", mask_token(refresh_token))
         
-        is_valid, body = tokens_up(
+        is_valid, body = tokens_up(  # type: ignore[reportAssignmentType]
             refresh_token=refresh_token, 
-            access_token=credentionals.credentials,  # binary service access token
-            schema=ServicePayload
+            access_token=credentials.credentials,  # binary service access token
+            carrier=TokenBearer.SERVICE
             )
         span.add_event("the tokens has been processed")
         span.set_attribute("service.is_tokens_valid", is_valid)
         
         if is_valid:
-            span.set_attribute("service.created_access_token", mask_token(body[0]))
-            span.set_attribute("service.created_refresh_token", mask_token(body[1]))
-            return {
-                "access_token": body[0],
-                "refresh_token": body[1]
-                }
+            body: AuthenticationResponse.TokensSet
+            span.set_attribute("service.created_access_token", mask_token(body.access_token))
+            span.set_attribute("service.created_refresh_token", mask_token(body.refresh_token))
+            return body
         else:
             span.set_status(Status(StatusCode.ERROR))
-            raise body
+            raise body  # type: ignore[reportGeneralTypeIssues]
