@@ -1,17 +1,15 @@
-from typing import Optional
-
 from api.deps import ServesUsers_ServiceJWT, ServiceJWT
-from api.v1.routers.shemas import (CreateClientRequest, UpdateClientRequest,
-                                   VerifyRequest)
+from api.v1.routers.schemes import (CreateClientRequest, UpdateClientRequest,
+                                    VerifyRequest)
 from fastapi import APIRouter, HTTPException, status
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from patisson_request.errors import ErrorCode, ErrorSchema
-from patisson_request.jwt_tokens import ClientPayload, TokenBearer
+from patisson_request.jwt_tokens import ClientAccessTokenPayload, TokenBearer
 from patisson_request.service_responses import AuthenticationResponse
-from patisson_request.service_roles import ClientRole
+from patisson_request.roles import ClientRole
 from tokens.jwt import (check_token, create_client_token, create_refresh_token,
-                        create_sub, mask_token, tokens_up)
+                        mask_token, tokens_up)
 
 router = APIRouter()
 tracer = trace.get_tracer(__name__)
@@ -47,7 +45,7 @@ async def create(service_jwt: ServesUsers_ServiceJWT,
         span.set_attribute("client.created_access_token", mask_token(access_token))
         
         refresh_token = create_refresh_token(
-            sub=create_sub(TokenBearer.CLIENT, client_id)
+            sub=client_id
         )
         span.add_event("refresh token is ready")
         span.set_attribute("service.created_refresh_token", mask_token(refresh_token))
@@ -59,22 +57,21 @@ async def create(service_jwt: ServesUsers_ServiceJWT,
     
     
 @router.post('/verify')
-async def verify(service_jwt: ServiceJWT, request: VerifyRequest) -> ClientPayload:
-    client_access_token = request.access_token
+async def verify(service_jwt: ServiceJWT, request: VerifyRequest) -> AuthenticationResponse.Verify:
     
+    client_access_token = request.access_token
     with tracer.start_as_current_span("verify") as span:
         span.set_attribute("client.passed_access_token", mask_token(client_access_token))
         
         is_valid, body = check_token(token=client_access_token, 
-                                     schema=ClientPayload, carrier=TokenBearer.CLIENT)
+                                     schema=ClientAccessTokenPayload, carrier=TokenBearer.CLIENT)
         span.add_event("the token has been processed")
         span.set_attribute("client.is_access_token_valid", is_valid)
         
         if is_valid:
-            return body  # type: ignore[reportReturnType]
-        else: 
-            span.set_status(Status(StatusCode.ERROR))
-            raise HTTPException(status_code=401, detail="Invalid access token")
+            return AuthenticationResponse.Verify(is_verify=is_valid, payload=body, error=None)  # type: ignore[reportArgumentType]
+        else:
+            return AuthenticationResponse.Verify(is_verify=is_valid, payload=None, error=body)  # type: ignore[reportArgumentType]
     
     
 @router.post('/update')
