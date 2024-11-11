@@ -11,7 +11,7 @@ from patisson_request.jwt_tokens import (BaseAccessTokenPayload,
                                          RefreshTokenPayload,
                                          ServiceAccessTokenPayload,
                                          TokenBearer, TokenType)
-from patisson_request.service_responses import AuthenticationResponse
+from patisson_request.service_responses import TokensSet
 from patisson_request.roles import Role
 from patisson_request.services import Service
 from pydantic import ValidationError
@@ -90,7 +90,7 @@ def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> str:
 
 def tokens_up(refresh_token: AnyStr, access_token: AnyStr, 
               carrier: TokenBearer, expires_in: Optional[Seconds] = None) -> (
-                  tuple[Literal[True], AuthenticationResponse.TokensSet] 
+                  tuple[Literal[True], TokensSet] 
                   | tuple[Literal[False], HTTPException]
                   ):
     '''
@@ -147,7 +147,7 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
         expires_in=expires_in
     )
     
-    return True, AuthenticationResponse.TokensSet(
+    return True, TokensSet(
         access_token=new_access_token,
         refresh_token=new_refresh_token
     )

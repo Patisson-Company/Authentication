@@ -1,13 +1,12 @@
 from api.deps import ServesUsers_ServiceJWT, ServiceJWT
-from api.v1.routers.schemes import (CreateClientRequest, UpdateClientRequest,
-                                    VerifyRequest)
 from fastapi import APIRouter, HTTPException, status
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from patisson_request.errors import ErrorCode, ErrorSchema
 from patisson_request.jwt_tokens import ClientAccessTokenPayload, TokenBearer
-from patisson_request.service_responses import AuthenticationResponse
 from patisson_request.roles import ClientRole
+from patisson_request.service_requests import AuthenticationRequest
+from patisson_request.service_responses import AuthenticationResponse, TokensSet
 from tokens.jwt import (check_token, create_client_token, create_refresh_token,
                         mask_token, tokens_up)
 
@@ -16,7 +15,7 @@ tracer = trace.get_tracer(__name__)
 
 @router.post('/create')
 async def create(service_jwt: ServesUsers_ServiceJWT, 
-                 request: CreateClientRequest) -> AuthenticationResponse.TokensSet:
+                 request: AuthenticationRequest.CreateClient) -> TokensSet:
     client_id = request.client_id
     client_role = request.client_role
     expire_in = request.expire_in
@@ -50,20 +49,20 @@ async def create(service_jwt: ServesUsers_ServiceJWT,
         span.add_event("refresh token is ready")
         span.set_attribute("service.created_refresh_token", mask_token(refresh_token))
         
-    return AuthenticationResponse.TokensSet(
+    return TokensSet(
         access_token=access_token,
         refresh_token=refresh_token
     )
     
     
 @router.post('/verify')
-async def verify(service_jwt: ServiceJWT, request: VerifyRequest) -> AuthenticationResponse.Verify:
+async def verify(service_jwt: ServiceJWT, request: AuthenticationRequest.Verify) -> AuthenticationResponse.Verify:
     
     client_access_token = request.access_token
     with tracer.start_as_current_span("verify") as span:
-        span.set_attribute("client.passed_access_token", mask_token(client_access_token))
+        span.set_attribute("client.passed_access_token", mask_token(str(client_access_token)))
         
-        is_valid, body = check_token(token=client_access_token, 
+        is_valid, body = check_token(token=str(client_access_token), 
                                      schema=ClientAccessTokenPayload, carrier=TokenBearer.CLIENT)
         span.add_event("the token has been processed")
         span.set_attribute("client.is_access_token_valid", is_valid)
@@ -75,19 +74,19 @@ async def verify(service_jwt: ServiceJWT, request: VerifyRequest) -> Authenticat
     
     
 @router.post('/update')
-async def update(service_jwt: ServesUsers_ServiceJWT, request: UpdateClientRequest) -> AuthenticationResponse.TokensSet:
+async def update(service_jwt: ServesUsers_ServiceJWT, request: AuthenticationRequest.UpdateClient) -> TokensSet:
     client_access_token = request.client_access_token
     client_refresh_token = request.client_refresh_token
     expire_in = request.expire_in
 
     with tracer.start_as_current_span("tokens-up") as span:
-        span.set_attribute(f"client.passed_access_token", mask_token(client_access_token))
-        span.set_attribute(f"client.passed_refresh_token", mask_token(client_refresh_token))
+        span.set_attribute(f"client.passed_access_token", mask_token(str(client_access_token)))
+        span.set_attribute(f"client.passed_refresh_token", mask_token(str(client_refresh_token)))
         span.set_attribute("token.expire_in", str(expire_in))
         
         is_valid, body = tokens_up(  # type: ignore[reportAssignmentType]
-            refresh_token=client_refresh_token, 
-            access_token=client_access_token, 
+            refresh_token=str(client_refresh_token), 
+            access_token=str(client_access_token), 
             carrier=TokenBearer.CLIENT,
             expires_in=expire_in
         )
@@ -95,10 +94,9 @@ async def update(service_jwt: ServesUsers_ServiceJWT, request: UpdateClientReque
         span.set_attribute("client.is_tokens_valid", is_valid)
         
         if is_valid:
-            body: AuthenticationResponse.TokensSet
-            span.set_attribute("client.created_access_token", mask_token(body.access_token))
-            span.set_attribute("client.created_refresh_token", mask_token(body.refresh_token))
-            return body
+            span.set_attribute("client.created_access_token", mask_token(body.access_token))  # type: ignore[reportAttributeAccessIssue]
+            span.set_attribute("client.created_refresh_token", mask_token(body.refresh_token))  # type: ignore[reportAttributeAccessIssue]
+            return body  # type: ignore[reportReturnType]
         else:
             span.set_status(Status(StatusCode.ERROR))
-            raise HTTPException(status_code=401, detail=str(body)) 
+            raise body  # type: ignore[reportGeneralTypeIssues]
