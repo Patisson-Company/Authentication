@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
-from patisson_request.errors import ErrorCode, ErrorSchema
 from patisson_request.jwt_tokens import ServiceAccessTokenPayload, TokenBearer
 from patisson_request.roles import ServiceRole
 from patisson_request.service_requests import AuthenticationRequest

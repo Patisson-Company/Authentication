@@ -27,7 +27,10 @@ def verify_service_token(credentials: HTTPAuthorizationCredentials = Depends(sec
             return body  # type: ignore[reportReturnType]
         else:
             span.set_status(Status(StatusCode.ERROR))
-            raise body  # type: ignore[reportReturnType]
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=[body.model_dump()]
+                )
 
 
 def verify_serves_users_service_token(token: ServiceAccessTokenPayload = Depends(verify_service_token)
@@ -41,7 +44,10 @@ def verify_serves_users_service_token(token: ServiceAccessTokenPayload = Depends
             span.set_status(Status(StatusCode.ERROR))
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=[ErrorSchema(error=ErrorCode.ACCESS_ERROR, extra=TokenBearer.SERVICE.value)]
+                detail=[ErrorSchema(
+                        error=ErrorCode.ACCESS_ERROR, 
+                        extra=TokenBearer.SERVICE.value).model_dump()
+                        ]
                 )
         return token
     
