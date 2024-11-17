@@ -1,4 +1,5 @@
 from api.deps import ServesUsers_ServiceJWT, ServiceJWT
+from config import logger
 from fastapi import APIRouter, HTTPException, status
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
@@ -6,7 +7,8 @@ from patisson_request.errors import ErrorCode, ErrorSchema
 from patisson_request.jwt_tokens import ClientAccessTokenPayload, TokenBearer
 from patisson_request.roles import ClientRole
 from patisson_request.service_requests import AuthenticationRequest
-from patisson_request.service_responses import AuthenticationResponse, TokensSet
+from patisson_request.service_responses import (AuthenticationResponse,
+                                                TokensSetResponse)
 from tokens.jwt import (check_token, create_client_token, create_refresh_token,
                         mask_token, tokens_up)
 
@@ -14,8 +16,9 @@ router = APIRouter()
 tracer = trace.get_tracer(__name__)
 
 @router.post('/create')
-async def create(service_jwt: ServesUsers_ServiceJWT, 
-                 request: AuthenticationRequest.CreateClient) -> TokensSet:
+async def create(
+    service_jwt: ServesUsers_ServiceJWT, request: AuthenticationRequest.CreateClient
+    ) -> TokensSetResponse:
     client_id = request.client_id
     client_role = request.client_role
     expire_in = request.expire_in
@@ -28,10 +31,11 @@ async def create(service_jwt: ServesUsers_ServiceJWT,
         try:
             role = ClientRole(client_role)
         except ValueError as e:
+            logger.warning(f'the {service_jwt.sub} service tried to create a token with a non-existent role')
             span.set_status(Status(StatusCode.ERROR))
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=[ErrorSchema(error=ErrorCode.INVALID_PARAMETERS, extra=str(e))]
+                detail=[ErrorSchema(error=ErrorCode.INVALID_PARAMETERS, extra=str(e)).model_dump()]
             )
     
     with tracer.start_as_current_span("creating-tokens") as span:
@@ -49,14 +53,17 @@ async def create(service_jwt: ServesUsers_ServiceJWT,
         span.add_event("refresh token is ready")
         span.set_attribute("service.created_refresh_token", mask_token(refresh_token))
         
-    return TokensSet(
+    logger.info(f'tokens have been successfully created for {client_id} by {service_jwt.sub}')
+    return TokensSetResponse(
         access_token=access_token,
         refresh_token=refresh_token
     )
     
     
 @router.post('/verify')
-async def verify(service_jwt: ServiceJWT, request: AuthenticationRequest.Verify) -> AuthenticationResponse.Verify:
+async def verify(
+    service_jwt: ServiceJWT, request: AuthenticationRequest.Verify
+    ) -> AuthenticationResponse.Verify:
     
     client_access_token = request.access_token
     with tracer.start_as_current_span("verify") as span:
@@ -68,13 +75,17 @@ async def verify(service_jwt: ServiceJWT, request: AuthenticationRequest.Verify)
         span.set_attribute("client.is_access_token_valid", is_valid)
         
         if is_valid:
+            logger.info(f'the {body.sub} token is valid, the verifying service {service_jwt.sub}')  # type: ignore[reportArgumentType]
             return AuthenticationResponse.Verify(is_verify=is_valid, payload=body, error=None)  # type: ignore[reportArgumentType]
         else:
+            logger.info(f'the token is not valid, the verifying service {service_jwt.sub}')  # type: ignore[reportArgumentType]
             return AuthenticationResponse.Verify(is_verify=is_valid, payload=None, error=body)  # type: ignore[reportArgumentType]
     
     
 @router.post('/update')
-async def update(service_jwt: ServesUsers_ServiceJWT, request: AuthenticationRequest.UpdateClient) -> TokensSet:
+async def update(
+    service_jwt: ServesUsers_ServiceJWT, request: AuthenticationRequest.UpdateClient
+    ) -> TokensSetResponse:
     client_access_token = request.client_access_token
     client_refresh_token = request.client_refresh_token
     expire_in = request.expire_in
@@ -96,7 +107,12 @@ async def update(service_jwt: ServesUsers_ServiceJWT, request: AuthenticationReq
         if is_valid:
             span.set_attribute("client.created_access_token", mask_token(body.access_token))  # type: ignore[reportAttributeAccessIssue]
             span.set_attribute("client.created_refresh_token", mask_token(body.refresh_token))  # type: ignore[reportAttributeAccessIssue]
+            logger.info(f'the {service_jwt.sub} has successfully updated the tokens for clients')
             return body  # type: ignore[reportReturnType]
         else:
             span.set_status(Status(StatusCode.ERROR))
-            raise body  # type: ignore[reportGeneralTypeIssues]
+            logger.warning(f'service {service_jwt.sub} was unable to update tokens for the client: {body}')
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=[error.model_dump() for error in body]  # type: ignore[reportAttributeAccessIssue]
+            )

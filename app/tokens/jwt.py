@@ -2,7 +2,8 @@ from datetime import UTC, datetime, timedelta
 from typing import AnyStr, Literal, Optional, TypeAlias, TypeVar
 
 import jwt
-from config import JWT_ALGORITHM, JWT_EXPIRATION_TIME, JWT_KEY, SERVICE_NAME
+from config import (JWT_ALGORITHM, JWT_EXPIRATION_TIME, JWT_KEY, SERVICE_NAME,
+                    logger)
 from fastapi import HTTPException, status
 from patisson_request.errors import ErrorCode, ErrorSchema
 from patisson_request.jwt_tokens import (BaseAccessTokenPayload,
@@ -11,8 +12,8 @@ from patisson_request.jwt_tokens import (BaseAccessTokenPayload,
                                          RefreshTokenPayload,
                                          ServiceAccessTokenPayload,
                                          TokenBearer, TokenType)
-from patisson_request.service_responses import TokensSet
 from patisson_request.roles import Role
+from patisson_request.service_responses import TokensSetResponse
 from patisson_request.services import Service
 from pydantic import ValidationError
 
@@ -41,6 +42,7 @@ def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds
         iat=int(now.timestamp()),
         role=role
     )
+    logger.debug(f'a client token has been created ({payload})')
     return jwt.encode(payload.model_dump(), JWT_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -63,6 +65,7 @@ def create_service_token(role: Role, service: Service, expires_in: Optional[Seco
         iat=int(now.timestamp()),
         role=role
     )
+    logger.debug(f'a service token has been created ({payload})')
     return jwt.encode(payload.model_dump(), JWT_KEY, algorithm=JWT_ALGORITHM)
 
 
@@ -85,13 +88,14 @@ def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> str:
         exp=int((now + expires_in_).timestamp()),
         iat=int(now.timestamp())
     )
+    logger.debug(f'a refresh token has been created ({payload})')
     return jwt.encode(payload.model_dump(), JWT_KEY, algorithm=JWT_ALGORITHM)
 
 
 def tokens_up(refresh_token: AnyStr, access_token: AnyStr, 
               carrier: TokenBearer, expires_in: Optional[Seconds] = None) -> (
-                  tuple[Literal[True], TokensSet] 
-                  | tuple[Literal[False], HTTPException]
+                  tuple[Literal[True], TokensSetResponse] 
+                  | tuple[Literal[False], list[ErrorSchema]]
                   ):
     '''
     Checks access and refresh tokens, and if they are valid, 
@@ -123,10 +127,8 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
     except AttributeError:  # AttributeError: 'ErrorSchema' object has no attribute "sub"
         pass
     if len(errors_report) > 0:
-        return False, HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=[error.model_dump() for error in errors_report]
-        )  
+        logger.debug(f'errors: {errors_report}')
+        return False, errors_report
     
     access_body: BaseAccessTokenPayload
     refresh_body: RefreshTokenPayload
@@ -146,8 +148,8 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
         sub=access_body.sub,
         expires_in=expires_in
     )
-    
-    return True, TokensSet(
+    logger.debug(f'tokens have been successfully updated for {carrier}')
+    return True, TokensSetResponse(
         access_token=new_access_token,
         refresh_token=new_refresh_token
     )
@@ -192,8 +194,10 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: TokenBearer) -> (
         )
     finally:
         if flag: 
+            logger.debug(f'the token is valid ({body})')
             return True, body  # type: ignore[reportReturnType]
         else: 
+            logger.debug(f'the token is not valid ({error_})')
             return False, error_
 
 
