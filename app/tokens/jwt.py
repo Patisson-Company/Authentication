@@ -4,7 +4,6 @@ from typing import AnyStr, Literal, Optional, TypeAlias, TypeVar
 import jwt
 from config import (JWT_ALGORITHM, JWT_EXPIRATION_TIME, JWT_KEY, SERVICE_NAME,
                     logger)
-from fastapi import HTTPException, status
 from patisson_request.errors import ErrorCode, ErrorSchema
 from patisson_request.jwt_tokens import (BaseAccessTokenPayload,
                                          BaseTokenPayload,

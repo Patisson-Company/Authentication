@@ -82,7 +82,8 @@ async def verify(
         span.set_attribute(f"service.verified_service_jwt", mask_token(str(verified_service_jwt)))
         
         is_valid, body = check_token(token=str(verified_service_jwt), 
-                                     schema=ServiceAccessTokenPayload, carrier=TokenBearer.SERVICE)
+                                     schema=ServiceAccessTokenPayload, 
+                                     carrier=TokenBearer.SERVICE)
         span.add_event("the token has been processed")
         span.set_attribute("service.is_verified_service_jwt_valid", is_valid)
         
@@ -121,4 +122,7 @@ async def update(
         else:
             span.set_status(Status(StatusCode.ERROR))
             logger.warning(f'service {service_jwt.sub} was unable to update tokens: {body}')
-            raise body  # type: ignore[reportGeneralTypeIssues]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=[error.model_dump() for error in body]  # type: ignore[reportAttributeAccessIssue]
+            )

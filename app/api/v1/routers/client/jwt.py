@@ -70,7 +70,8 @@ async def verify(
         span.set_attribute("client.passed_access_token", mask_token(str(client_access_token)))
         
         is_valid, body = check_token(token=str(client_access_token), 
-                                     schema=ClientAccessTokenPayload, carrier=TokenBearer.CLIENT)
+                                     schema=ClientAccessTokenPayload, 
+                                     carrier=TokenBearer.CLIENT)
         span.add_event("the token has been processed")
         span.set_attribute("client.is_access_token_valid", is_valid)
         
