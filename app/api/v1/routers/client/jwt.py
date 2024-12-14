@@ -4,21 +4,22 @@ from fastapi import APIRouter, HTTPException, status
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from patisson_request.errors import ErrorCode, ErrorSchema
-from patisson_request.jwt_tokens import ClientAccessTokenPayload, TokenBearer
+from patisson_request.jwt_tokens import (ClientAccessTokenPayload, TokenBearer,
+                                         mask_token)
 from patisson_request.roles import ClientRole
 from patisson_request.service_requests import AuthenticationRequest
 from patisson_request.service_responses import (AuthenticationResponse,
                                                 TokensSetResponse)
 from tokens.jwt import (check_token, create_client_token, create_refresh_token,
-                        mask_token, tokens_up)
+                        tokens_up)
 
 router = APIRouter()
 tracer = trace.get_tracer(__name__)
 
 @router.post('/create')
-async def create(
-    service_jwt: ServesUsers_ServiceJWT, request: AuthenticationRequest.CreateClient
-    ) -> TokensSetResponse:
+async def create_route(service_jwt: ServesUsers_ServiceJWT, 
+                 request: AuthenticationRequest.CreateClient
+                 ) -> TokensSetResponse:
     client_id = request.client_id
     client_role = request.client_role
     expire_in = request.expire_in
@@ -61,9 +62,9 @@ async def create(
     
     
 @router.post('/verify')
-async def verify(
-    service_jwt: ServiceJWT, request: AuthenticationRequest.Verify
-    ) -> AuthenticationResponse.Verify:
+async def verify_route(service_jwt: ServiceJWT, 
+                 request: AuthenticationRequest.Verify
+                 ) -> AuthenticationResponse.Verify:
     
     client_access_token = request.access_token
     with tracer.start_as_current_span("verify") as span:
@@ -84,9 +85,9 @@ async def verify(
     
     
 @router.post('/update')
-async def update(
-    service_jwt: ServesUsers_ServiceJWT, request: AuthenticationRequest.UpdateClient
-    ) -> TokensSetResponse:
+async def update_route(service_jwt: ServesUsers_ServiceJWT, 
+                 request: AuthenticationRequest.UpdateClient
+                 ) -> TokensSetResponse:
     client_access_token = request.client_access_token
     client_refresh_token = request.client_refresh_token
     expire_in = request.expire_in

@@ -7,21 +7,26 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from patisson_request.errors import ErrorCode, ErrorSchema
-from patisson_request.jwt_tokens import ServiceAccessTokenPayload, TokenBearer
+from patisson_request.jwt_tokens import ServiceAccessTokenPayload, TokenBearer, mask_token
 from sqlalchemy.orm import Session
-from tokens.jwt import check_token, mask_token
+from tokens.jwt import check_token
 
 security = HTTPBearer()
 tracer = trace.get_tracer(__name__)
 
 
-def verify_service_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> ServiceAccessTokenPayload | HTTPException:
+def verify_service_token(credentials: HTTPAuthorizationCredentials = Depends(security)
+                         ) -> ServiceAccessTokenPayload | HTTPException:
     with tracer.start_as_current_span("verify-service-token") as span:
         token = credentials.credentials
         token_mask = mask_token(token)
         span.set_attribute("service.access_token", token_mask)
         
-        is_valid, body = check_token(token=token, schema=ServiceAccessTokenPayload, carrier=TokenBearer.SERVICE)
+        is_valid, body = check_token(
+            token=token, 
+            schema=ServiceAccessTokenPayload, 
+            carrier=TokenBearer.SERVICE
+            )
         span.add_event("the token has been processed")
         span.set_attribute("service.is_access_token_valid", is_valid)
         

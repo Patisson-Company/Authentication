@@ -1,3 +1,32 @@
+"""
+Authentication Utilities Module.
+
+This module provides functions and utilities for handling authentication tasks 
+within the authentication service. While primarily designed to authenticate 
+services and clients using tokens (JWT), it is extensible to support other 
+authentication mechanisms in the future.
+
+Key Functions:
+    - `create_client_token`: Generates a JWT token for client authentication.
+    - `create_service_token`: Generates a JWT token for service authentication.
+    - `create_refresh_token`: Generates a refresh token for renewing access tokens.
+    - `tokens_up`: Validates and updates access and refresh tokens.
+    - `check_token`: Validates a token and extracts its payload if valid.
+
+Features:
+    - Support for both service and client authentication via bearer tokens.
+    - Modular design to accommodate additional token schemas or alternative 
+      authentication methods in the future.
+    - Token validation with detailed error reporting using `ErrorSchema`.
+    - Logging of authentication events for debugging and auditing purposes.
+
+Usage:
+    This module is intended for use within the authentication service to verify 
+    and issue tokens. It can also be extended to authenticate external services 
+    and clients via APIs or other integrations.
+
+"""
+
 from datetime import UTC, datetime, timedelta
 from typing import AnyStr, Literal, Optional, TypeAlias, TypeVar
 
@@ -23,11 +52,24 @@ Seconds: TypeAlias = int
 
 
 def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds] = None) -> str:
-    '''
-    Creates a jwt token for the client.
-    
-    If expire_in is set to None, the default value will be used.
-    '''
+    """
+    Generate a JWT token for a client.
+
+    Args:
+        role (Role): The role associated with the token.
+        client_id (str): The unique identifier of the client.
+        expires_in (Optional[Seconds]): Token expiration time in seconds. 
+            If not specified, the default expiration time is used.
+
+    Returns:
+        str: A signed JWT token for the client.
+
+    Raises:
+        ValueError: If any required parameter is invalid.
+
+    Notes:
+        Logs a debug message when the token is successfully created.
+    """
     expires_in_ = timedelta(seconds=expires_in) if expires_in else JWT_EXPIRATION_TIME 
     now = datetime.now(UTC)
     payload_model = ClientAccessTokenPayload
@@ -46,11 +88,24 @@ def create_client_token(role: Role, client_id: str, expires_in: Optional[Seconds
 
 
 def create_service_token(role: Role, service: Service, expires_in: Optional[Seconds] = None) -> str:
-    '''
-    Creates a jwt token for the service.
-    
-    If expire_in is set to None, the default value will be used.
-    '''
+    """
+    Generate a JWT token for a service.
+
+    Args:
+        role (Role): The role associated with the token.
+        service (Service): The service identifier for which the token is created.
+        expires_in (Optional[Seconds]): Token expiration time in seconds. 
+            If not specified, the default expiration time is used.
+
+    Returns:
+        str: A signed JWT token for the service.
+
+    Raises:
+        ValueError: If any required parameter is invalid.
+
+    Notes:
+        Logs a debug message when the token is successfully created.
+    """
     expires_in_ = timedelta(seconds=expires_in) if expires_in else JWT_EXPIRATION_TIME
     now = datetime.now(UTC)
     payload_model = ServiceAccessTokenPayload[Service]
@@ -69,13 +124,24 @@ def create_service_token(role: Role, service: Service, expires_in: Optional[Seco
 
 
 def create_refresh_token(sub: str, expires_in: Optional[Seconds] = None) -> str:
-    '''
-    Creates a refresh token for a client or service.
-    
-    If expire_in is set to None, the default value will be used.
-    
-    To pass a sub, use create_sub() from the same module.
-    '''
+    """
+    Generate a refresh token for a client or service.
+
+    Args:
+        sub (str): The subject of the token, typically created using the `create_sub()` function 
+            from the same module.
+        expires_in (Optional[Seconds]): Token expiration time in seconds. 
+            If not specified, the default expiration time is used.
+
+    Returns:
+        str: A signed refresh token.
+
+    Raises:
+        ValueError: If any required parameter is invalid.
+
+    Notes:
+        Logs a debug message when the token is successfully created.
+    """
     expires_in_ = timedelta(seconds=expires_in) if expires_in else JWT_EXPIRATION_TIME
     now = datetime.now(UTC)
     payload_model = RefreshTokenPayload
@@ -96,13 +162,31 @@ def tokens_up(refresh_token: AnyStr, access_token: AnyStr,
                   tuple[Literal[True], TokensSetResponse] 
                   | tuple[Literal[False], list[ErrorSchema]]
                   ):
-    '''
-    Checks access and refresh tokens, and if they are valid, 
-    returns True with the first argument and tuple with a pair of new tokens. 
-    
-    If the passed tokens are not valid, 
-    it returns False with the first argument and HTTPException with the second.
-    '''
+    """
+    Verify and update access and refresh tokens.
+
+    Args:
+        refresh_token (AnyStr): The refresh token to validate.
+        access_token (AnyStr): The access token to validate.
+        carrier (TokenBearer): Indicates the token type (`TokenBearer.CLIENT` or `TokenBearer.SERVICE`).
+        expires_in (Optional[Seconds]): The expiration time for the new tokens. 
+            If not specified, the default expiration time is used.
+
+    Returns:
+        tuple: A tuple where:
+            - The first element is a boolean indicating success (`True`) or failure (`False`).
+            - The second element is either:
+                - `TokensSetResponse` containing new access and refresh tokens on success.
+                - A list of `ErrorSchema` instances indicating validation errors on failure.
+
+    Raises:
+        AssertionError: If the `sub` fields of the access and refresh tokens do not match.
+        AttributeError: If a token validation error prevents accessing the `sub` attribute.
+
+    Notes:
+        Logs the errors if the tokens are invalid.
+        On success, logs the creation of new tokens for the specified carrier.
+    """
     is_access_token_valid, access_body = check_token(
         token=access_token, 
         schema=ClientAccessTokenPayload if carrier == TokenBearer.CLIENT else ServiceAccessTokenPayload, 
@@ -158,18 +242,29 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: TokenBearer) -> (
                     tuple[Literal[True], PAYLOAD] 
                     | tuple[Literal[False], ErrorSchema]
                     ):
-    '''
-    Verifies the token. If the token has passed verification, 
-    it returns True with the first argument 
-    and the payload of the token with the second argument.
-    
-    If the token fails verification, it returns False with the first argument 
-    and HttpException with the second argument.
-    
-    If _return_ErrorSchema=True and the token is not valid, 
-    it returns False with the first argument 
-    and ErrorSchema (patisson_errors.core) with the second.
-    '''
+    """
+    Validate a token and return its payload if valid.
+
+    Args:
+        token (AnyStr): The JWT token to validate.
+        schema (type[PAYLOAD]): The expected payload schema for validation.
+        carrier (TokenBearer): Indicates the token type (`TokenBearer.CLIENT` or `TokenBearer.SERVICE`).
+
+    Returns:
+        tuple: A tuple where:
+            - The first element is a boolean indicating validity (`True` for valid, `False` for invalid).
+            - The second element is either:
+                - The decoded payload (`PAYLOAD`) if the token is valid.
+                - An `ErrorSchema` instance describing the error if the token is invalid.
+
+    Raises:
+        jwt.ExpiredSignatureError: If the token's signature has expired.
+        jwt.InvalidTokenError: If the token is invalid or tampered with.
+        ValidationError: If the payload does not match the expected schema.
+
+    Notes:
+        Logs whether the token is valid or invalid. If invalid, the error details are logged.
+    """
     flag = False
     try:
         body = schema(
@@ -198,14 +293,3 @@ def check_token(token: AnyStr, schema: type[PAYLOAD], carrier: TokenBearer) -> (
         else: 
             logger.debug(f'the token is not valid ({error_})')
             return False, error_
-
-
-def mask_token(token: str, visible_chars: int = 4) -> str:
-    '''
-    Closes the token * except for the last characters.
-    '''
-    if len(token) <= visible_chars:
-        return token
-    masked_part = '*' * (len(token) - visible_chars)
-    visible_part = token[-visible_chars:]
-    return f"{masked_part}{visible_part}"

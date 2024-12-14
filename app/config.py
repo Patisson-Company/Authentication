@@ -3,12 +3,13 @@ import os
 from datetime import timedelta
 
 from dotenv import load_dotenv
+from patisson_request.services import Service
 
 root_path = os.path.join(os.path.dirname(__file__), '..')
 
 load_dotenv(dotenv_path=os.path.join(root_path, '.env'))
 
-SERVICE_NAME = 'authentication'
+SERVICE_NAME = Service.AUTHENTICATION.value
 SERVICE_HOST: str = os.getenv("SERVICE_HOST_")  # type: ignore[reportArgumentType]
 
 JWT_KEY: str = os.getenv("JWT_KEY")  # type: ignore[reportArgumentType]

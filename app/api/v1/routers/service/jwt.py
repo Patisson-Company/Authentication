@@ -7,22 +7,23 @@ from fastapi.security import HTTPAuthorizationCredentials
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from patisson_request.errors import ErrorCode, ErrorSchema
-from patisson_request.jwt_tokens import ServiceAccessTokenPayload, TokenBearer
+from patisson_request.jwt_tokens import (ServiceAccessTokenPayload,
+                                         TokenBearer, mask_token)
 from patisson_request.roles import ServiceRole
 from patisson_request.service_requests import AuthenticationRequest
 from patisson_request.service_responses import (AuthenticationResponse,
                                                 TokensSetResponse)
 from patisson_request.services import Service
 from tokens.jwt import (check_token, create_refresh_token,
-                        create_service_token, mask_token, tokens_up)
+                        create_service_token, tokens_up)
 
 router = APIRouter()
 tracer = trace.get_tracer(__name__)
 
 @router.post('/create')
-async def create(
-    session: SessionDep, request: AuthenticationRequest.CreateService
-    ) -> TokensSetResponse:
+async def create_route(session: SessionDep, 
+                 request: AuthenticationRequest.CreateService
+                 ) -> TokensSetResponse:
     login = request.login
     password = request.password
     
@@ -73,10 +74,9 @@ async def create(
         
         
 @router.post('/verify')
-async def verify(
-    service_jwt: ServiceJWT, request: AuthenticationRequest.Verify
-    ) -> AuthenticationResponse.Verify:
-        
+async def verify_route(service_jwt: ServiceJWT, 
+                 request: AuthenticationRequest.Verify
+                 ) -> AuthenticationResponse.Verify:
     verified_service_jwt = request.access_token
     with tracer.start_as_current_span("verify") as span:
         span.set_attribute(f"service.verified_service_jwt", mask_token(str(verified_service_jwt)))
@@ -96,10 +96,10 @@ async def verify(
 
 
 @router.post('/update')
-async def update(
-    service_jwt: ServiceJWT, request: AuthenticationRequest.UpdateService, 
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-    ) -> TokensSetResponse:
+async def update_route(service_jwt: ServiceJWT, 
+                 request: AuthenticationRequest.UpdateService, 
+                 credentials: HTTPAuthorizationCredentials = Depends(security)
+                 ) -> TokensSetResponse:
     refresh_token = request.refresh_token
 
     # A token with the AnyStr type is required, not a ServicePayload (type of service_jwt)
