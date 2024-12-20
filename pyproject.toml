@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "authentication"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["EliseyGodX"]
 package-mode = false
