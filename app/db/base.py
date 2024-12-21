@@ -11,20 +11,21 @@ engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 Base = declarative_base()
 
 async_session = sessionmaker(  # type: ignore[reportCallIssue]
-    bind=engine,  # type: ignore[reportArgumentType]
-    class_=AsyncSession,
-    expire_on_commit=False
+    bind=engine, class_=AsyncSession, expire_on_commit=False  # type: ignore[reportArgumentType]
 )
+
 
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session() as session:  # type: ignore[reportGeneralTypeIssues]
         yield session
-        
+
+
 def _db_init():
     async def create_tables():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
     loop = asyncio.get_event_loop()
     if loop.is_running():
         return loop.create_task(create_tables())

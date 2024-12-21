@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "authentication"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = ["EliseyGodX"]
 package-mode = false
@@ -19,6 +19,46 @@ sqlalchemy = "^2.0.36"
 asyncpg = "^0.30.0"
 patisson-request = { git = "https://github.com/Patisson-Company/_Request" }
 
+[tool.poetry.group.dev.dependencies]
+flake8 = "^7.1.1"
+flake8-isort = "^6.1.1"
+flake8-bugbear = "^24.12.12"
+flake8-pyproject = "^1.2.3"
+flake8-docstrings = "^1.7.0"
+black = "^24.10.0"
+
+[tool.black]
+line-length = 110
+
+[tool.flake8]
+max-line-length = 110
+required-plugins = [
+    "flake8-annotations",
+    "flake8-bugbear",
+    "flake8-docstrings",
+    "flake8-isort",
+    "flake8-pyproject",
+    "mccabe",
+    "pycodestyle",
+    "pyflakes",
+]
+ignore = [
+    "B907",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+    "D104",
+    "D106",
+    "D107",
+    "E701",
+    "I001",
+    "I005",
+    "W503",
+]
+select = ["ANN", "B", "C", "D", "E", "F", "I", "T4", "W"]
+extend-select = ["B9"]
 
 [build-system]
 requires = ["poetry-core"]

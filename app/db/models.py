@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 class Service(Base):
     __tablename__ = "services"
 
