@@ -1,3 +1,5 @@
+from typing import Self
+
 from db.base import Base
 from passlib.context import CryptContext
 from sqlalchemy import Column, Integer, String
@@ -13,8 +15,9 @@ class Service(Base):
     password = Column(String, nullable=False)
     role = Column(String, nullable=False)
 
-    def set_password(self, password: str) -> None:
+    def set_password(self, password: str) -> Self:
         self.password = pwd_context.hash(password)
+        return self
 
     def check_password(self, password: str) -> bool:
         return pwd_context.verify(password, str(self.password))

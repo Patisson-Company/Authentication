@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from .jwt import router as jwt_router
 
 router = APIRouter()

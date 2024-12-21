@@ -35,7 +35,7 @@ async def create_route(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=[ErrorSchema(error=ErrorCode.INVALID_PARAMETERS, extra=str(e)).model_dump()],
-            )
+            ) from e
 
     with tracer.start_as_current_span("creating-tokens") as span:
         access_token = create_client_token(role=role, client_id=client_id, expires_in=expire_in)

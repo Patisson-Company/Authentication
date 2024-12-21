@@ -16,7 +16,7 @@ tracer = trace.get_tracer(__name__)
 
 
 def verify_service_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
 ) -> ServiceAccessTokenPayload | HTTPException:
     with tracer.start_as_current_span("verify-service-token") as span:
         token = credentials.credentials
@@ -39,7 +39,7 @@ def verify_service_token(
 
 
 def verify_serves_users_service_token(
-    token: ServiceAccessTokenPayload = Depends(verify_service_token),
+    token: ServiceAccessTokenPayload = Depends(verify_service_token),  # noqa: B008
 ) -> ServiceAccessTokenPayload | HTTPException:
     with tracer.start_as_current_span("checking-access-rights") as span:
         span.set_attribute("service.role", token.role.name)

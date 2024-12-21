@@ -52,7 +52,7 @@ async def create_route(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=[ErrorSchema(error=ErrorCode.INVALID_PARAMETERS, extra=str(e)).model_dump()],
-            )
+            ) from e
 
         span.add_event("access token is ready")
         span.set_attribute("service.created_access_token", mask_token(access_token))
@@ -96,6 +96,7 @@ async def verify_route(
                 "the token is not valid,"  # type: ignore[reportArgumentType]
                 f" the verifying service {service_jwt.sub}"
             )
+
             return AuthenticationResponse.Verify(
                 is_verify=is_valid, payload=None, error=body  # type: ignore[reportArgumentType]
             )
@@ -105,7 +106,7 @@ async def verify_route(
 async def update_route(
     service_jwt: ServiceJWT,
     request: AuthenticationRequest.UpdateService,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials = Depends(security),  # noqa: B008
 ) -> TokensSetResponse:
     refresh_token = request.refresh_token
 
@@ -118,6 +119,7 @@ async def update_route(
             access_token=credentials.credentials,  # binary service access token
             carrier=TokenBearer.SERVICE,
         )
+
         span.add_event("the tokens has been processed")
         span.set_attribute("service.is_tokens_valid", is_valid)
 
@@ -128,7 +130,7 @@ async def update_route(
             )
             span.set_attribute(
                 "service.created_refresh_token",
-                mask_token(body.refresh_token)  # type: ignore[reportAttributeAccessIssue]
+                mask_token(body.refresh_token),  # type: ignore[reportAttributeAccessIssue]
             )
             logger.info(f"the {service_jwt.sub} has successfully updated the tokens")
             return body  # type: ignore[reportReturnType]

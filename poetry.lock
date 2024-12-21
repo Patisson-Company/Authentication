@@ -885,7 +885,7 @@ resolved_reference = "a9397471c2042bc80797a1257067f1f44f82504b"
 
 [[package]]
 name = "patisson-request"
-version = "1.7.3"
+version = "1.8.0"
 description = "a library that regulates the interaction between microservices"
 optional = false
 python-versions = "^3.12"
@@ -905,7 +905,7 @@ redis = "^5.2.1"
 type = "git"
 url = "https://github.com/Patisson-Company/_Request"
 reference = "HEAD"
-resolved_reference = "3640e8235d2534b5f7e88fa2a96ac14074e709ab"
+resolved_reference = "ba5b81218f997421944337e0fb8325d8225a5276"
 
 [[package]]
 name = "platformdirs"
