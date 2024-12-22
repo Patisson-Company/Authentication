@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "authentication"
-version = "0.1.3"
+version = "1.0.0"
 description = ""
 authors = ["EliseyGodX"]
+readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]

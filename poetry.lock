@@ -850,7 +850,7 @@ files = [
 
 [[package]]
 name = "patisson-applauncher"
-version = "1.2.2"
+version = "1.2.3"
 description = "a launcher for properly launching microservices"
 optional = false
 python-versions = "^3.12"
@@ -881,7 +881,7 @@ uvicorn = ["uvicorn (>=0.34.0,<0.35.0)"]
 type = "git"
 url = "https://github.com/Patisson-Company/_AppLauncher"
 reference = "HEAD"
-resolved_reference = "a9397471c2042bc80797a1257067f1f44f82504b"
+resolved_reference = "dd37be8275ca77f3fd492ea101404fa37336d346"
 
 [[package]]
 name = "patisson-request"

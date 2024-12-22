@@ -271,7 +271,7 @@ def check_token(
     finally:
         if flag:
             logger.debug(f"the token is valid ({body})")
-            return True, body  # type: ignore[reportReturnType]
+            return True, body  # type: ignore[reportReturnType]  # noqa: B012
         else:
             logger.debug(f"the token is not valid ({error_})")
-            return False, error_
+            return False, error_  # noqa: B012
